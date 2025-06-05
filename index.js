@@ -1,13 +1,25 @@
+'use strict';
+
 let todoForm = document.querySelector('form');
 let taskInput = document.getElementById('taskInput');
 let taskList = document.getElementById('taskList');
 let buttonNewTask = document.querySelector('.newTask');
 
-let tasks = [];
+let saveStateTask = document.querySelector('.saveStateTask');
+
+let localTaskState = loadTasks() || [];
 
 document.addEventListener('DOMContentLoaded', getTasks);
+saveStateTask.addEventListener('click', saveStateTasks);
 buttonNewTask.addEventListener('click', addTask);
-// filterOption.addEventListener('change', filterTodo);
+
+function loadTasks() {
+    return JSON.parse(localStorage.getItem('todoTasks'));
+}
+
+function saveTasks(tasks) {
+    localStorage.setItem('todoTasks', JSON.stringify(tasks));
+}
 
 function addTask(event) {
     event.preventDefault();
@@ -19,23 +31,27 @@ function addTask(event) {
         return;
     }
 
-    saveTasksLocalStorage(textTask);
+    let tasks = loadTasks() || [];
+
+    const newTask = {
+        name: textTask,
+        completed: false,
+    };
+
+    tasks.push(newTask);
+
+    saveTasks(tasks);
     getTasks();
 
     taskInput.value = '';
 }
 
 function getTasks() {
-    let todos;
-    if (localStorage.getItem('todoTasks') === null) {
-        todos = [];
-    } else {
-        todos = JSON.parse(localStorage.getItem('todoTasks'));
-    }
+    localTaskState = loadTasks() || [];
 
     taskList.innerHTML = '';
 
-    todos.forEach(function (todo, index) {
+    localTaskState.forEach(function (todo, index) {
         const listItem = document.createElement('li');
         listItem.innerText = todo.name;
         listItem.classList.add('todo-item');
@@ -46,7 +62,7 @@ function getTasks() {
         completedButton.checked = todo.completed;
         completedButton.classList.add('checkTask');
         completedButton.addEventListener('change', (event) => {
-            toggleCheck(index, event.target.checked);
+            toggleCheck(index, event.target.checked, event.target);
         });
 
         // Botón eliminar
@@ -72,51 +88,48 @@ function getTasks() {
     });
 }
 
-function toggleCheck(index, state) {
-    let todos = JSON.parse(localStorage.getItem('todoTasks'));
+function toggleCheck(index, state, checkbox) {
+    if (!localTaskState || !localTaskState[index]) return;
 
-    console.log(index, state);
+    localTaskState[index].completed = state;
 
-    if (index !== undefined && index !== null) {
-        console.log('estamos en el if del toggle');
-        todos[index].completed = state;
-        localStorage.setItem('todoTasks', JSON.stringify(todos));
-        getTasks();
+    if (state) {
+        checkbox.closest('li').classList.add('completed');
+    } else {
+        checkbox.closest('li').classList.remove('completed');
     }
+
+    console.log(`Tarea ${index} marcada como: ${state}`);
+}
+
+function saveStateTasks() {
+    saveTasks(localTaskState);
+    alert('Cambios guardados correctamente');
 }
 
 function updateTask(index) {
-    let todos = JSON.parse(localStorage.getItem('todoTasks'));
-    const nuevaTarea = prompt('Edita la tarea:', todos[index].name);
+    const nuevaTarea = prompt('Edita la tarea:', localTaskState[index].name);
 
     if (nuevaTarea !== null && nuevaTarea.trim() !== '') {
-        todos[index].name = nuevaTarea.trim();
-        localStorage.setItem('todoTasks', JSON.stringify(todos));
-        getTasks();
+        localTaskState[index].name = nuevaTarea.trim();
+        saveTasks(localTaskState);
+
+        // Actualizar directamente el <li> correspondiente en el DOM
+        const listItems = document.querySelectorAll('#taskList li');
+        if (listItems[index]) {
+            // Solo cambiamos el texto del nodo de texto (primer hijo)
+            listItems[index].childNodes[0].textContent = nuevaTarea.trim();
+        }
     }
 }
 
 function deleteTask(index) {
-    let todos = JSON.parse(localStorage.getItem('todoTasks'));
-    todos.splice(index, 1);
-    localStorage.setItem('todoTasks', JSON.stringify(todos));
-    getTasks();
-}
+    localTaskState.splice(index, 1);
+    saveTasks(localTaskState);
 
-function saveTasksLocalStorage(task) {
-    let todoTasks;
+    const listItems = document.querySelectorAll('#taskList li');
 
-    if (localStorage.getItem('todoTasks') === null) {
-        todoTasks = [];
-    } else {
-        todoTasks = JSON.parse(localStorage.getItem('todoTasks'));
+    if (listItems[index]) {
+        listItems[index].remove();
     }
-
-    const newTask = {
-        name: task,
-        completed: false,
-    };
-
-    todoTasks.push(newTask);
-    localStorage.setItem('todoTasks', JSON.stringify(todoTasks));
 }
