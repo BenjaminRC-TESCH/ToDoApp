@@ -1,39 +1,148 @@
-const todoInput = document.querySelector('.todo-input');
-const todoButton = document.querySelector('.todo-button');
-const todoList = document.querySelector('.todo-list');
+'use strict';
+
+let todoForm = document.querySelector('form');
+let taskInput = document.getElementById('taskInput');
+let taskList = document.getElementById('taskList');
+let buttonNewTask = document.querySelector('.newTask');
+
+let saveStateTask = document.querySelector('.saveStateTask');
+
+let localTaskState = loadTasks() || [];
 
 document.addEventListener('DOMContentLoaded', getTasks);
-todoButton.addEventListener('click', addTask);
-todoList.addEventListener('click', deleteCheck);
+saveStateTask.addEventListener('click', saveStateTasks);
+buttonNewTask.addEventListener('click', addTask);
+
+function loadTasks() {
+    return JSON.parse(localStorage.getItem('todoTasks'));
+}
+
+function saveTasks(tasks) {
+    localStorage.setItem('todoTasks', JSON.stringify(tasks));
+}
 
 function addTask(event) {
     event.preventDefault();
 
-    const todoDiv = document.createElement('div');
-    todoDiv.classList.add('todo');
+    let textTask = taskInput.value.trim();
 
-    const newTodo = document.createElement('li');
-    newTodo.innerHTML = todoInput.value;
-    newTodo.classList.add('todo-item');
-    todoDiv.appendChild(newTodo);
+    if (!textTask) {
+        alert('Escribe algo');
+        return;
+    }
 
-    //ADDING TO LOCAL STORAGE
-    //saveLocalTodos(todoInput.value);
+    let tasks = loadTasks() || [];
 
-    const completedButton = document.createElement('button');
-    completedButton.innerHTML = '<i class="fas fa-check-circle"></li>';
-    completedButton.classList.add('complete-btn');
-    todoDiv.appendChild(completedButton);
+    const newTask = {
+        id: crypto.randomUUID(),
+        name: textTask,
+        completed: false,
+    };
 
-    const trashButton = document.createElement('button');
-    trashButton.innerHTML = '<i class="fas fa-trash"></li>';
-    trashButton.classList.add('trash-btn');
-    todoDiv.appendChild(trashButton);
+    localTaskState.push(newTask);
+    saveTasks(localTaskState);
+    getTasks();
 
-    todoList.appendChild(todoDiv);
-    todoInput.value = '';
+    taskInput.value = '';
 }
 
-function getTasks() {}
+function getTasks() {
+    localTaskState = loadTasks() || [];
 
-function deleteCheck() {}
+    taskList.innerHTML = '';
+
+    localTaskState.forEach(function (todo, index) {
+        const listItem = document.createElement('li');
+        listItem.innerText = todo.name;
+        listItem.classList.add('todo-item');
+
+        //Completar
+        const completedButton = document.createElement('input');
+        completedButton.type = 'checkbox';
+        completedButton.checked = todo.completed;
+        completedButton.classList.add('checkTask');
+        completedButton.addEventListener('change', (event) => {
+            toggleCheck(todo.id, event.target.checked, event.target);
+        });
+
+        // Botón eliminar
+        const deleteButton = document.createElement('button');
+        deleteButton.innerHTML = `<img src="./img/bin.png">`;
+        deleteButton.classList.add('deleteTask');
+        deleteButton.addEventListener('click', () => {
+            deleteTask(todo.id);
+        });
+
+        // Botón actualizar
+        const updateButton = document.createElement('button');
+        updateButton.innerHTML = `<img src="./img/edit.png">`;
+        updateButton.classList.add('updateTask');
+        updateButton.addEventListener('click', () => {
+            updateTask(todo.id);
+        });
+
+        listItem.appendChild(completedButton);
+        listItem.appendChild(deleteButton);
+        listItem.appendChild(updateButton);
+        taskList.appendChild(listItem);
+    });
+}
+
+function toggleCheck(id, state, checkbox) {
+    const index = localTaskState.findIndex((task) => task.id === id);
+    if (index === -1) return;
+
+    localTaskState[index].completed = state;
+
+    if (state) {
+        checkbox.closest('li').classList.add('completed');
+    } else {
+        checkbox.closest('li').classList.remove('completed');
+    }
+
+    console.log(`Tarea ${index} marcada como: ${state}`);
+}
+
+function saveStateTasks() {
+    saveTasks(localTaskState);
+    alert('Cambios guardados correctamente');
+}
+
+function updateTask(id) {
+    const index = localTaskState.findIndex((task) => task.id === id);
+
+    if (index === -1) {
+        console.warn('No se encontró el ID en localTaskState');
+        return;
+    }
+
+    const nuevaTarea = prompt('Edita la tarea:', localTaskState[index].name);
+
+    if (nuevaTarea !== null && nuevaTarea.trim() !== '') {
+        localTaskState[index].name = nuevaTarea.trim();
+        saveTasks(localTaskState);
+
+        const listItems = document.querySelectorAll('#taskList li');
+        if (listItems[index]) {
+            listItems[index].childNodes[0].textContent = nuevaTarea.trim();
+        }
+    }
+}
+
+function deleteTask(id) {
+    const index = localTaskState.findIndex((task) => task.id === id);
+
+    if (index === -1) {
+        console.warn('No se encontró el ID en localTaskState');
+        return;
+    }
+
+    localTaskState.splice(index, 1);
+    saveTasks(localTaskState);
+
+    const listItems = document.querySelectorAll('#taskList li');
+
+    if (listItems[index]) {
+        listItems[index].remove();
+    }
+}

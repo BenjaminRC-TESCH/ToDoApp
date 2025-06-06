@@ -4,14 +4,23 @@ let todoForm = document.querySelector('form');
 let taskInput = document.getElementById('taskInput');
 let taskList = document.getElementById('taskList');
 let buttonNewTask = document.querySelector('.newTask');
-
 let saveStateTask = document.querySelector('.saveStateTask');
 
 let localTaskState = loadTasks() || [];
 
-document.addEventListener('DOMContentLoaded', getTasks);
+//Pagination controls
+const tasksPerPage = 5;
+let currentPage = 1;
+
+document.addEventListener('DOMContentLoaded', renderAllTasks);
 saveStateTask.addEventListener('click', saveStateTasks);
 buttonNewTask.addEventListener('click', addTask);
+
+function getPaginatedTasks(tasks, page, perPage) {
+    const start = (page - 1) * perPage;
+    const end = start + perPage;
+    return tasks.slice(start, end);
+}
 
 function loadTasks() {
     return JSON.parse(localStorage.getItem('todoTasks'));
@@ -24,82 +33,109 @@ function saveTasks(tasks) {
 function addTask(event) {
     event.preventDefault();
 
-    let textTask = taskInput.value.trim();
-
+    const textTask = taskInput.value.trim();
     if (!textTask) {
         alert('Escribe algo');
         return;
     }
 
-    let tasks = loadTasks() || [];
-
     const newTask = {
+        id: crypto.randomUUID(),
         name: textTask,
         completed: false,
     };
 
-    tasks.push(newTask);
+    localTaskState.push(newTask);
+    saveTasks(localTaskState);
 
-    saveTasks(tasks);
-    getTasks();
+    /*
+    // Ajusta la página actual a la última página y renderiza todo
+    const totalPages = Math.ceil(localTaskState.length / tasksPerPage);
+    currentPage = totalPages;
+    */
+    renderAllTasks();
 
     taskInput.value = '';
 }
 
-function getTasks() {
-    localTaskState = loadTasks() || [];
-
+function renderAllTasks() {
     taskList.innerHTML = '';
 
-    localTaskState.forEach(function (todo, index) {
-        const listItem = document.createElement('li');
-        listItem.innerText = todo.name;
-        listItem.classList.add('todo-item');
+    const paginatedTasks = getPaginatedTasks(localTaskState, currentPage, tasksPerPage);
+    paginatedTasks.forEach(renderTask);
 
-        //Completar
-        const completedButton = document.createElement('input');
-        completedButton.type = 'checkbox';
-        completedButton.checked = todo.completed;
-        completedButton.classList.add('checkTask');
-        completedButton.addEventListener('change', (event) => {
-            toggleCheck(index, event.target.checked, event.target);
-        });
-
-        // Botón eliminar
-        const deleteButton = document.createElement('button');
-        deleteButton.innerHTML = `<img src="./img/bin.png">`;
-        deleteButton.classList.add('deleteTask');
-        deleteButton.addEventListener('click', () => {
-            deleteTask(index);
-        });
-
-        // Botón actualizar
-        const updateButton = document.createElement('button');
-        updateButton.innerHTML = `<img src="./img/edit.png">`;
-        updateButton.classList.add('updateTask');
-        updateButton.addEventListener('click', () => {
-            updateTask(index);
-        });
-
-        listItem.appendChild(completedButton);
-        listItem.appendChild(deleteButton);
-        listItem.appendChild(updateButton);
-        taskList.appendChild(listItem);
-    });
+    renderPaginationControls();
 }
 
-function toggleCheck(index, state, checkbox) {
-    if (!localTaskState || !localTaskState[index]) return;
+function renderPaginationControls() {
+    const totalPages = Math.ceil(localTaskState.length / tasksPerPage);
+    const container = document.getElementById('paginationControls');
+    container.innerHTML = '';
 
-    localTaskState[index].completed = state;
+    for (let i = 1; i <= totalPages; i++) {
+        const button = document.createElement('button');
+        button.textContent = i;
+        button.disabled = i === currentPage;
 
-    if (state) {
-        checkbox.closest('li').classList.add('completed');
-    } else {
-        checkbox.closest('li').classList.remove('completed');
+        button.addEventListener('click', () => {
+            currentPage = i;
+            renderAllTasks();
+        });
+
+        container.appendChild(button);
+    }
+}
+
+function renderTask(todo) {
+    const listItem = document.createElement('li');
+    listItem.classList.add('todo-item');
+    listItem.dataset.id = todo.id;
+
+    const taskText = document.createElement('span');
+    taskText.textContent = todo.name;
+    taskText.classList.add('task-text');
+
+    if (todo.completed) {
+        listItem.classList.add('completed');
     }
 
-    console.log(`Tarea ${index} marcada como: ${state}`);
+    const completedCheckbox = document.createElement('input');
+    completedCheckbox.type = 'checkbox';
+    completedCheckbox.checked = todo.completed;
+    completedCheckbox.classList.add('checkTask');
+    completedCheckbox.addEventListener('change', (event) => {
+        toggleCheck(todo.id, event.target.checked);
+    });
+
+    const deleteButton = document.createElement('button');
+    deleteButton.innerHTML = `<img src="./img/bin.png">`;
+    deleteButton.classList.add('deleteTask');
+    deleteButton.addEventListener('click', () => deleteTask(todo.id));
+
+    const updateButton = document.createElement('button');
+    updateButton.innerHTML = `<img src="./img/edit.png">`;
+    updateButton.classList.add('updateTask');
+    updateButton.addEventListener('click', () => updateTask(todo.id));
+
+    listItem.appendChild(completedCheckbox);
+    listItem.appendChild(taskText);
+    listItem.appendChild(deleteButton);
+    listItem.appendChild(updateButton);
+
+    taskList.appendChild(listItem);
+}
+
+function toggleCheck(id, state) {
+    const index = localTaskState.findIndex((task) => task.id === id);
+    if (index === -1) return;
+
+    localTaskState[index].completed = state;
+    saveTasks(localTaskState);
+
+    const listItem = taskList.querySelector(`li[data-id="${id}"]`);
+    if (listItem) {
+        listItem.classList.toggle('completed', state);
+    }
 }
 
 function saveStateTasks() {
@@ -107,29 +143,34 @@ function saveStateTasks() {
     alert('Cambios guardados correctamente');
 }
 
-function updateTask(index) {
-    const nuevaTarea = prompt('Edita la tarea:', localTaskState[index].name);
+function updateTask(id) {
+    const index = localTaskState.findIndex((task) => task.id === id);
+    if (index === -1) return;
 
+    const nuevaTarea = prompt('Edita la tarea:', localTaskState[index].name);
     if (nuevaTarea !== null && nuevaTarea.trim() !== '') {
         localTaskState[index].name = nuevaTarea.trim();
         saveTasks(localTaskState);
 
-        // Actualizar directamente el <li> correspondiente en el DOM
-        const listItems = document.querySelectorAll('#taskList li');
-        if (listItems[index]) {
-            // Solo cambiamos el texto del nodo de texto (primer hijo)
-            listItems[index].childNodes[0].textContent = nuevaTarea.trim();
+        const listItem = taskList.querySelector(`li[data-id="${id}"]`);
+        if (listItem) {
+            listItem.querySelector('.task-text').textContent = nuevaTarea.trim();
         }
     }
+    renderAllTasks();
 }
 
-function deleteTask(index) {
+function deleteTask(id) {
+    const index = localTaskState.findIndex((task) => task.id === id);
+    if (index === -1) return;
+
     localTaskState.splice(index, 1);
     saveTasks(localTaskState);
 
-    const listItems = document.querySelectorAll('#taskList li');
-
-    if (listItems[index]) {
-        listItems[index].remove();
+    const listItem = taskList.querySelector(`li[data-id="${id}"]`);
+    if (listItem) {
+        listItem.remove();
     }
+
+    crenderAllTasks();
 }
